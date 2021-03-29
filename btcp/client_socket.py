@@ -27,6 +27,7 @@ class BTCPClientSocket(BTCPSocket):
     you probably want to use Queues, or a similar thread safe collection.
     """
 
+    state = BTCPStates.CLOSED
 
     def __init__(self, window, timeout):
         """Constructor for the bTCP client socket. Allocates local resources
@@ -52,6 +53,10 @@ class BTCPClientSocket(BTCPSocket):
     ###########################################################################
 
     def lossy_layer_segment_received(self, segment):
+        
+        if (state = BTCPStates.SYN_RCVD):
+        
+        elif (state = BTCPStates.CLOSED):
         """Called by the lossy layer whenever a segment arrives.
 
         Things you should expect to handle here (or in helper methods called

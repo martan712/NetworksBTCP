@@ -35,6 +35,28 @@ class BTCPSocket:
 
     @staticmethod
     def in_cksum(segment):
+        if not segment or len(segment)<10:
+            return 0x0000
+
+        buffer = segment[:10]
+
+        oc = 0x0000
+        
+        i = 0
+        while i < len(buffer):
+            num = buffer[i]*pow(2,8)
+
+            if(i+1 < len(buffer)):
+                num+=buffer[i+1]
+
+            oc = ones_comp_add(oc, num) 
+
+            i+=2
+        
+        if oc == 65535 or oc == 0:
+            return 65535
+        
+        return oc ^ 65535
         """Compute the internet checksum of the segment given as argument.
         Consult lecture 3 for details.
 
@@ -80,10 +102,12 @@ class BTCPSocket:
     @staticmethod
     def unpack_segment_header(header):
         """Unpack the individual bTCP header field values from the header.
-
+        
         Remember that Python supports multiple return values through automatic
         tupling, so it's easy to simply return all of them in one go rather
         than make a separate method for every individual field.
         """
-        pass
-        raise NotImplementedError("No implementation of unpack_segment_header present. Read the comments & code of btcp_socket.py. You should really implement the packing / unpacking of the header into field values before doing anything else!")
+
+        sequence_number, acknowledgement_number, flags, window, data_length, checksum = struct.unpack('!HHBBHH', header)
+
+        return sequence_number, acknowledgement_number, flags, window, data_length, checksum
