@@ -44,6 +44,7 @@ class BTCPClientSocket(BTCPSocket):
         self.mutex = True
         self.sequence_number = 4237
         self.ack_number = 0
+        self.acked_until = 4237
 
 
     ###########################################################################
@@ -116,8 +117,20 @@ class BTCPClientSocket(BTCPSocket):
         """
         #pass # present to be able to remove the NotImplementedError without having to implement anything yet.
         #raise NotImplementedError("No implementation of lossy_layer_tick present. Read the comments & code of client_socket.py.")
-        True
+        if (self.state == BTCPStates.SYN_SENT):
+            SYN = super().build_segment_header(
+                            self.sequence_number, self.ack_number,
+                            syn_set=True, ack_set=False, fin_set=False,
+                            window=0x01, length=0, checksum=0)
 
+            self._lossy_layer.send_segment(SYN)
+
+        elif (self.state == BTCPStates.FIN_SENT):
+            FIN = super().build_segment_header(
+                            self.sequence_number, self.ack_number,
+                            syn_set=False, ack_set=False, fin_set=True,
+                            window=0x01, length=0, checksum=0)
+            self._lossy_layer.send_segment(FIN)
 
     ###########################################################################
     ### You're also building the socket API for the applications to use.    ###
@@ -166,13 +179,12 @@ class BTCPClientSocket(BTCPSocket):
                             syn_set=True, ack_set=False, fin_set=False,
                             window=0x01, length=0, checksum=0)
 
-        
         self.state = BTCPStates.SYN_SENT
         self._lossy_layer.send_segment(SYN)
         self.mutex = False
 
         while (self.mutex == False):
-            self._lossy_layer.send_segment(SYN)
+            continue
 
 
         ACK = super().build_segment_header(

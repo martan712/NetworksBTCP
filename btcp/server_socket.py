@@ -135,7 +135,20 @@ class BTCPServerSocket(BTCPSocket):
         
         #pass # present to be able to remove the NotImplementedError without having to implement anything yet.
         #raise NotImplementedError("No implementation of lossy_layer_tick present. Read the comments & code of server_socket.py.")
-        True
+        if (self.state == BTCPStates.ACCEPTING):
+            self.state=BTCPStates.CLOSED
+
+        elif (self.state == BTCPStates.SYN_RCVD):
+            
+            SYNACK = super().build_segment_header(
+                                self.sequence_number, self.ack_number,
+                                syn_set=True, ack_set=True, fin_set=False,
+                                window=0x01, length=0, checksum=0)
+
+            self._lossy_layer.send_segment(SYNACK)
+
+        elif (self.state == BTCPStates.CLOSING):
+            self.state=BTCPStates.CLOSED
 
     ###########################################################################
     ### You're also building the socket API for the applications to use.    ###
@@ -201,7 +214,7 @@ class BTCPServerSocket(BTCPSocket):
         self.mutex_accept = False
 
         while (self.mutex_accept == False):
-            self._lossy_layer.send_segment(SYNACK)
+            continue
 
         self.state = BTCPStates.ESTABLISHED
         print("server connected")
