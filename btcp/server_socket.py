@@ -41,9 +41,15 @@ class BTCPServerSocket(BTCPSocket):
         """
         super().__init__(window, timeout)
         self._lossy_layer = LossyLayer(self, SERVER_IP, SERVER_PORT, CLIENT_IP, CLIENT_PORT)
+
+        # Global state of the program
         self.state = BTCPStates.CLOSED
-        self.mutex_accept = True
-        self.sequence_number = 3742
+
+        # Mutex variable that is locked by the different parts of this program, and unlocked upon receiving a correct response
+        self.mutex = True
+
+        # Sequence and acknoledgement numbers
+        self.sequence_number = 0
         self.ack_number = 0
 
     ###########################################################################
@@ -78,18 +84,23 @@ class BTCPServerSocket(BTCPSocket):
 
         Remember, we expect you to implement this *as a state machine!*
         """
+
+        # The unpacking of the segment message and the segment header
         message = segment[0]
         sequence_number, acknowledgement_number, flags, window, data_length, checksum= super().unpack_segment_header(message[:10])
+
+        # Get the flags into a 3 character string
         flag_bits = "{0:3b}".format(flags)
 
+        # STATE MACHINE
         if (self.state == BTCPStates.ACCEPTING):
             if (flag_bits[0] == "1"):
-                self.mutex_accept = True
+                self.mutex = True
                 self.ack_number = acknowledgement_number
 
         elif (self.state == BTCPStates.SYN_RCVD):
             if (flag_bits[1] == "1"):
-                self.mutex_accept = True
+                self.mutex = True
 
         elif (self.state == BTCPStates.ESTABLISHED):
             if (flag_bits[2] == "1"):
@@ -133,8 +144,7 @@ class BTCPServerSocket(BTCPSocket):
         lossy_layer_segment_received or lossy_layer_tick.
         """
         
-        #pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        #raise NotImplementedError("No implementation of lossy_layer_tick present. Read the comments & code of server_socket.py.")
+        # STATE MACHINE
         if (self.state == BTCPStates.ACCEPTING):
             self.state=BTCPStates.CLOSED
 
@@ -196,27 +206,35 @@ class BTCPServerSocket(BTCPSocket):
         more advanced thread synchronization in this project.
         """
         
-        #RANDOMIZE FIRST TWO NUMBERS AND WINDOW, AND HANDLE CHECKSUM
-        self.state = BTCPStates.ACCEPTING
-        self.mutex_accept = False
+        #STILL HAVE TO HANDLE WINDOW AND CHECKSUM
 
-        while (self.mutex_accept == False):
+        # Update state and lock mutex
+        self.state = BTCPStates.ACCEPTING
+        self.mutex = False
+
+        # Wait for appropriate message
+        while (self.mutex == False):
             continue
 
+        # Create SYNACK segment
         SYNACK = super().build_segment_header(
                             self.sequence_number, self.ack_number,
                             syn_set=True, ack_set=True, fin_set=False,
                             window=0x01, length=0, checksum=0)
 
+        # Update state, send segment and lock mutex
         self.state = BTCPStates.SYN_RCVD
         self._lossy_layer.send_segment(SYNACK)
+        self.mutex = False
 
-        self.mutex_accept = False
-
-        while (self.mutex_accept == False):
+        # Wait for appropriate response
+        while (self.mutex == False):
             continue
 
+        # Update state
         self.state = BTCPStates.ESTABLISHED
+
+        # Show user server has connected
         print("server connected")
 
     def recv(self):
