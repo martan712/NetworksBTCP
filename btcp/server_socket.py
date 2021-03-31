@@ -43,6 +43,8 @@ class BTCPServerSocket(BTCPSocket):
         self._lossy_layer = LossyLayer(self, SERVER_IP, SERVER_PORT, CLIENT_IP, CLIENT_PORT)
         self.state = BTCPStates.CLOSED
         self.mutex_accept = True
+        self.sequence_number = 3742
+        self.ack_number = 0
 
     ###########################################################################
     ### The following section is the interface between the transport layer  ###
@@ -83,6 +85,7 @@ class BTCPServerSocket(BTCPSocket):
         if (self.state == BTCPStates.ACCEPTING):
             if (flag_bits[0] == "1"):
                 self.mutex_accept = True
+                self.ack_number = acknowledgement_number
 
         elif (self.state == BTCPStates.SYN_RCVD):
             if (flag_bits[1] == "1"):
@@ -91,7 +94,7 @@ class BTCPServerSocket(BTCPSocket):
         elif (self.state == BTCPStates.ESTABLISHED):
             if (flag_bits[2] == "1"):
                 FINACK = super().build_segment_header(
-                                0, 0,
+                                self.sequence_number, self.ack_number,
                                 syn_set=False, ack_set=True, fin_set=True,
                                 window=0x01, length=0, checksum=0)
                 self.state = BTCPStates.CLOSING
@@ -100,15 +103,13 @@ class BTCPServerSocket(BTCPSocket):
         elif (self.state == BTCPStates.CLOSING):
             if (flag_bits[2] == "1"):
                 FINACK = super().build_segment_header(
-                                0, 0,
+                                self.sequence_number, self.ack_number,
                                 syn_set=False, ack_set=True, fin_set=True,
                                 window=0x01, length=0, checksum=0)
                 self._lossy_layer.send_segment(FINACK)
-                print("server not shutdown")
                 
             elif (flag_bits[1] == "1"):
                 self.state = BTCPStates.CLOSED
-                print("server shutdown")
 
     def lossy_layer_tick(self):
         """Called by the lossy layer whenever no segment has arrived for
@@ -183,16 +184,16 @@ class BTCPServerSocket(BTCPSocket):
         """
         
         #RANDOMIZE FIRST TWO NUMBERS AND WINDOW, AND HANDLE CHECKSUM
-        SYNACK = super().build_segment_header(
-                            0, 0,
-                            syn_set=True, ack_set=True, fin_set=False,
-                            window=0x01, length=0, checksum=0)
-
         self.state = BTCPStates.ACCEPTING
         self.mutex_accept = False
 
         while (self.mutex_accept == False):
             continue
+
+        SYNACK = super().build_segment_header(
+                            self.sequence_number, self.ack_number,
+                            syn_set=True, ack_set=True, fin_set=False,
+                            window=0x01, length=0, checksum=0)
 
         self.state = BTCPStates.SYN_RCVD
         self._lossy_layer.send_segment(SYNACK)

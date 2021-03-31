@@ -42,6 +42,8 @@ class BTCPClientSocket(BTCPSocket):
         self._lossy_layer = LossyLayer(self, CLIENT_IP, CLIENT_PORT, SERVER_IP, SERVER_PORT)
         self.state = BTCPStates.CLOSED
         self.mutex = True
+        self.sequence_number = 4237
+        self.ack_number = 0
 
 
     ###########################################################################
@@ -77,6 +79,8 @@ class BTCPClientSocket(BTCPSocket):
         if (self.state == BTCPStates.SYN_SENT):
             if (flag_bits[0] == "1" and flag_bits[1] == "1"):
                 self.mutex = True
+                self.ack_number = acknowledgement_number
+
         elif (self.state == BTCPStates.ESTABLISHED):
             # Receive any message, and ack the appropriate message
             True
@@ -158,13 +162,8 @@ class BTCPClientSocket(BTCPSocket):
         
         #RANDOMIZE FIRST TWO NUMBERS AND WINDOW, AND HANDLE CHECKSUM
         SYN = super().build_segment_header(
-                            0, 0,
+                            self.sequence_number, self.ack_number,
                             syn_set=True, ack_set=False, fin_set=False,
-                            window=0x01, length=0, checksum=0)
-
-        ACK = super().build_segment_header(
-                            0, 0,
-                            syn_set=False, ack_set=True, fin_set=False,
                             window=0x01, length=0, checksum=0)
 
         
@@ -174,6 +173,12 @@ class BTCPClientSocket(BTCPSocket):
 
         while (self.mutex == False):
             self._lossy_layer.send_segment(SYN)
+
+
+        ACK = super().build_segment_header(
+                            self.sequence_number, self.ack_number,
+                            syn_set=False, ack_set=True, fin_set=False,
+                            window=0x01, length=0, checksum=0)
 
         self.state = BTCPStates.ESTABLISHED
         self._lossy_layer.send_segment(ACK)
@@ -222,12 +227,12 @@ class BTCPClientSocket(BTCPSocket):
         more advanced thread synchronization in this project.
         """
         FIN = super().build_segment_header(
-                            0, 0,
+                            self.sequence_number, self.ack_number,
                             syn_set=False, ack_set=False, fin_set=True,
                             window=0x01, length=0, checksum=0)
 
         ACK = super().build_segment_header(
-                            0, 0,
+                            self.sequence_number, self.ack_number,
                             syn_set=False, ack_set=True, fin_set=False,
                             window=0x01, length=0, checksum=0)
 
