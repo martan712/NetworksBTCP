@@ -84,9 +84,31 @@ class BTCPServerSocket(BTCPSocket):
             if (flag_bits[0] == "1"):
                 self.mutex_accept = True
 
-        if (self.state == BTCPStates.SYN_RCVD):
+        elif (self.state == BTCPStates.SYN_RCVD):
             if (flag_bits[1] == "1"):
                 self.mutex_accept = True
+
+        elif (self.state == BTCPStates.ESTABLISHED):
+            if (flag_bits[2] == "1"):
+                FINACK = super().build_segment_header(
+                                0, 0,
+                                syn_set=False, ack_set=True, fin_set=True,
+                                window=0x01, length=0, checksum=0)
+                self.state = BTCPStates.CLOSING
+                self._lossy_layer.send_segment(FINACK)
+
+        elif (self.state == BTCPStates.CLOSING):
+            if (flag_bits[2] == "1"):
+                FINACK = super().build_segment_header(
+                                0, 0,
+                                syn_set=False, ack_set=True, fin_set=True,
+                                window=0x01, length=0, checksum=0)
+                self._lossy_layer.send_segment(FINACK)
+                print("server not shutdown")
+                
+            elif (flag_bits[1] == "1"):
+                self.state = BTCPStates.CLOSED
+                print("server shutdown")
 
     def lossy_layer_tick(self):
         """Called by the lossy layer whenever no segment has arrived for
@@ -181,6 +203,7 @@ class BTCPServerSocket(BTCPSocket):
             self._lossy_layer.send_segment(SYNACK)
 
         self.state = BTCPStates.ESTABLISHED
+        print("server connected")
 
     def recv(self):
         """Return data that was received from the client to the application in

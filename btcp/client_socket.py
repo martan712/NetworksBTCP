@@ -41,7 +41,7 @@ class BTCPClientSocket(BTCPSocket):
         super().__init__(window, timeout)
         self._lossy_layer = LossyLayer(self, CLIENT_IP, CLIENT_PORT, SERVER_IP, SERVER_PORT)
         self.state = BTCPStates.CLOSED
-        self.mutex_connect = True
+        self.mutex = True
 
 
     ###########################################################################
@@ -72,17 +72,18 @@ class BTCPClientSocket(BTCPSocket):
         """
         message = segment[0]
         sequence_number, acknowledgement_number, flags, window, data_length, checksum= super().unpack_segment_header(message[:10])
-        flag_bits = "{0:b}".format(flags)
+        flag_bits = "{0:3b}".format(flags)
 
         if (self.state == BTCPStates.SYN_SENT):
             if (flag_bits[0] == "1" and flag_bits[1] == "1"):
-                self.mutex_connect = True
+                self.mutex = True
         elif (self.state == BTCPStates.ESTABLISHED):
             # Receive any message, and ack the appropriate message
             True
         elif (self.state == BTCPStates.FIN_SENT):
             # if message states that both FIN and ack, then we go to state BTCPStates.CLOSED and we send ACK.
-            True
+            if (flag_bits[1] == "1" and flag_bits[2] == "1"):
+                self.mutex = True
 
 
     def lossy_layer_tick(self):
@@ -169,13 +170,14 @@ class BTCPClientSocket(BTCPSocket):
         
         self.state = BTCPStates.SYN_SENT
         self._lossy_layer.send_segment(SYN)
-        self.mutex_connect = False
+        self.mutex = False
 
-        while (self.mutex_connect == False):
+        while (self.mutex == False):
             self._lossy_layer.send_segment(SYN)
 
         self.state = BTCPStates.ESTABLISHED
         self._lossy_layer.send_segment(ACK)
+        print("client connected")
 
     def send(self, data):
         """Send data originating from the application in a reliable way to the
@@ -219,8 +221,27 @@ class BTCPClientSocket(BTCPSocket):
         boolean or enum has the expected value. We do not think you will need
         more advanced thread synchronization in this project.
         """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of shutdown present. Read the comments & code of client_socket.py.")
+        FIN = super().build_segment_header(
+                            0, 0,
+                            syn_set=False, ack_set=False, fin_set=True,
+                            window=0x01, length=0, checksum=0)
+
+        ACK = super().build_segment_header(
+                            0, 0,
+                            syn_set=False, ack_set=True, fin_set=False,
+                            window=0x01, length=0, checksum=0)
+
+        
+        self.state = BTCPStates.FIN_SENT
+        self._lossy_layer.send_segment(FIN)
+        self.mutex = False
+
+        while (self.mutex == False):
+            self._lossy_layer.send_segment(FIN)
+
+        self.state = BTCPStates.CLOSED
+        self._lossy_layer.send_segment(ACK)
+        print("client shutdown")
 
 
     def close(self):
