@@ -17,12 +17,9 @@ class BTCPStates(Enum):
     ACCEPTING = 1
     SYN_SENT  = 2
     SYN_RCVD  = 3
-    _         = 4 # There's an obvious state that goes here. Give it a name.
+    ESTABLISHED = 4 # There's an obvious state that goes here. Give it a name.
     FIN_SENT  = 5
     CLOSING   = 6
-    __        = 7 # If you need more states, extend the Enum like this.
-    raise NotImplementedError("Check btcp_socket.py's BTCPStates enum. We left out some states you will need.")
-
 
 class BTCPSocket:
     """Base class for bTCP client and server sockets. Contains static helper
@@ -35,6 +32,15 @@ class BTCPSocket:
 
     @staticmethod
     def in_cksum(segment):
+        """Compute the internet checksum of the segment given as argument.
+        Consult lecture 3 for details.
+
+        Our bTCP implementation always has an even number of bytes in a segment.
+
+        Remember that, when computing the checksum value before *sending* the
+        segment, the checksum field in the header should be set to 0x0000, and
+        then the resulting checksum should be put in its place.
+        """
         if not segment or len(segment)<10:
             return 0x0000
 
@@ -57,17 +63,6 @@ class BTCPSocket:
             return 65535
         
         return oc ^ 65535
-        """Compute the internet checksum of the segment given as argument.
-        Consult lecture 3 for details.
-
-        Our bTCP implementation always has an even number of bytes in a segment.
-
-        Remember that, when computing the checksum value before *sending* the
-        segment, the checksum field in the header should be set to 0x0000, and
-        then the resulting checksum should be put in its place.
-        """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of in_cksum present. Read the comments & code of btcp_socket.py.")
 
 
     @staticmethod

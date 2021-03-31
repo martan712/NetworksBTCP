@@ -41,7 +41,8 @@ class BTCPServerSocket(BTCPSocket):
         """
         super().__init__(window, timeout)
         self._lossy_layer = LossyLayer(self, SERVER_IP, SERVER_PORT, CLIENT_IP, CLIENT_PORT)
-
+        self.state = BTCPStates.CLOSED
+        self.mutex_accept = True
 
     ###########################################################################
     ### The following section is the interface between the transport layer  ###
@@ -75,9 +76,17 @@ class BTCPServerSocket(BTCPSocket):
 
         Remember, we expect you to implement this *as a state machine!*
         """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of lossy_layer_segment_received present. Read the comments & code of server_socket.py.")
+        message = segment[0]
+        sequence_number, acknowledgement_number, flags, window, data_length, checksum= super().unpack_segment_header(message[:10])
+        flag_bits = "{0:3b}".format(flags)
 
+        if (self.state == BTCPStates.ACCEPTING):
+            if (flag_bits[0] == "1"):
+                self.mutex_accept = True
+
+        if (self.state == BTCPStates.SYN_RCVD):
+            if (flag_bits[1] == "1"):
+                self.mutex_accept = True
 
     def lossy_layer_tick(self):
         """Called by the lossy layer whenever no segment has arrived for
@@ -100,9 +109,10 @@ class BTCPServerSocket(BTCPSocket):
         candidate to put in a helper method which can be called from either
         lossy_layer_segment_received or lossy_layer_tick.
         """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of lossy_layer_tick present. Read the comments & code of server_socket.py.")
-
+        
+        #pass # present to be able to remove the NotImplementedError without having to implement anything yet.
+        #raise NotImplementedError("No implementation of lossy_layer_tick present. Read the comments & code of server_socket.py.")
+        True
 
     ###########################################################################
     ### You're also building the socket API for the applications to use.    ###
@@ -149,9 +159,28 @@ class BTCPServerSocket(BTCPSocket):
         boolean or enum has the expected value. We do not think you will need
         more advanced thread synchronization in this project.
         """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of accept present. Read the comments & code of server_socket.py.")
+        
+        #RANDOMIZE FIRST TWO NUMBERS AND WINDOW, AND HANDLE CHECKSUM
+        SYNACK = super().build_segment_header(
+                            0, 0,
+                            syn_set=True, ack_set=True, fin_set=False,
+                            window=0x01, length=0, checksum=0)
 
+        self.state = BTCPStates.ACCEPTING
+        self.mutex_accept = False
+
+        while (self.mutex_accept == False):
+            continue
+
+        self.state = BTCPStates.SYN_RCVD
+        self._lossy_layer.send_segment(SYNACK)
+
+        self.mutex_accept = False
+
+        while (self.mutex_accept == False):
+            self._lossy_layer.send_segment(SYNACK)
+
+        self.state = BTCPStates.ESTABLISHED
 
     def recv(self):
         """Return data that was received from the client to the application in
