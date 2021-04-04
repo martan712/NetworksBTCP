@@ -2,6 +2,7 @@ from btcp.btcp_socket import BTCPSocket, BTCPStates
 from btcp.lossy_layer import LossyLayer
 from btcp.constants import *
 
+import queue
 
 class BTCPClientSocket(BTCPSocket):
     """bTCP client socket
@@ -51,6 +52,10 @@ class BTCPClientSocket(BTCPSocket):
         self.sequence_number = 0
         self.ack_number = 0
         self.acked_until = 0
+
+        # Send buffer
+        self.send_buffer = queue.Queue()
+        self.buffer_index = 0
 
 
     ###########################################################################
@@ -145,6 +150,10 @@ class BTCPClientSocket(BTCPSocket):
                             window=0x01, length=0, checksum=0)
             self._lossy_layer.send_segment(FIN)
 
+        elif (self.state == BTCPStates.ESTABLISHED):
+            segment = self.send_buffer.get()
+            self._lossy_layer.send_segment(segment)
+            
     ###########################################################################
     ### You're also building the socket API for the applications to use.    ###
     ### The following section is the interface between the application      ###
@@ -239,9 +248,25 @@ class BTCPClientSocket(BTCPSocket):
 
         Again, you should feel free to deviate from how this usually works.
         """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of send present. Read the comments & code of client_socket.py.")
 
+        added = 0
+
+        DEF = super().build_segment_header(
+                            self.sequence_number, self.ack_number,
+                            syn_set=False, ack_set=False, fin_set=False,
+                            window=0x01, length=0, checksum=0)
+
+        index = 0
+
+        while index+1008 < len(data): 
+            segment = DEF + data[index:index+1008]
+            self.send_buffer.put(segment)
+            index = index + 1008
+        
+        segment = DEF + data[index:index+len(data)]
+        self.send_buffer.put(segment)
+
+        return index+len(data)
 
     def shutdown(self):
         """Perform the bTCP three-way finish to shutdown the connection.

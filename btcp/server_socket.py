@@ -2,6 +2,7 @@ from btcp.btcp_socket import BTCPSocket, BTCPStates
 from btcp.lossy_layer import LossyLayer
 from btcp.constants import *
 
+import queue
 
 class BTCPServerSocket(BTCPSocket):
     """bTCP server socket
@@ -51,6 +52,10 @@ class BTCPServerSocket(BTCPSocket):
         # Sequence and acknoledgement numbers
         self.sequence_number = 0
         self.ack_number = 0
+
+        # Receive buffer
+        self.receive_buffer = queue.Queue()
+        
 
     ###########################################################################
     ### The following section is the interface between the transport layer  ###
@@ -111,6 +116,9 @@ class BTCPServerSocket(BTCPSocket):
                 self.state = BTCPStates.CLOSING
                 self._lossy_layer.send_segment(FINACK)
 
+            else:
+                self.receive_buffer.put(message[10:])
+
         elif (self.state == BTCPStates.CLOSING):
             if (flag_bits[2] == "1"):
                 FINACK = super().build_segment_header(
@@ -145,10 +153,10 @@ class BTCPServerSocket(BTCPSocket):
         """
         
         # STATE MACHINE
-        if (self.state == BTCPStates.ACCEPTING):
-            self.state=BTCPStates.CLOSED
+        # if (self.state == BTCPStates.ACCEPTING):
+        #     self.state=BTCPStates.CLOSED
 
-        elif (self.state == BTCPStates.SYN_RCVD):
+        if (self.state == BTCPStates.SYN_RCVD):
             
             SYNACK = super().build_segment_header(
                                 self.sequence_number, self.ack_number,
@@ -268,9 +276,13 @@ class BTCPServerSocket(BTCPSocket):
 
         Again, you should feel free to deviate from how this usually works.
         """
-        pass # present to be able to remove the NotImplementedError without having to implement anything yet.
-        raise NotImplementedError("No implementation of recv present. Read the comments & code of server_socket.py.")
+        
+        while(self.receive_buffer.empty()):
+            continue
 
+        result = self.receive_buffer.queue.copy()
+        self.receive_buffer.queue.clear()
+        return result[0]
 
     def close(self):
         """Cleans up any internal state by at least destroying the instance of

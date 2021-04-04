@@ -13,7 +13,7 @@ reference. Python itself will run it fine, though.
 
 You can also use the file large_input.py as-is for file transfer.
 """
-from large_input import TEST_BYTES_128MIB
+# from large_input import TEST_BYTES_128MIB
 
 
 def btcp_file_transfer_server():
@@ -39,6 +39,11 @@ def btcp_file_transfer_server():
     # BTCPServerSocket's accept, and recv methods.
 
     # Clean up any state
+    s.accept()
+    
+    while(True):
+        output = s.recv()
+        print(len(output))
     s.close()
 
 
