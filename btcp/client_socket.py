@@ -55,7 +55,6 @@ class BTCPClientSocket(BTCPSocket):
 
         # Send buffer
         self.send_buffer = queue.Queue()
-        self.buffer_index = 0
 
 
     ###########################################################################
@@ -102,6 +101,7 @@ class BTCPClientSocket(BTCPSocket):
         elif (self.state == BTCPStates.ESTABLISHED):
             # Receive any message, and ack the appropriate message
             True
+
         elif (self.state == BTCPStates.FIN_SENT):
             # if message states that both FIN and ack, then we go to state BTCPStates.CLOSED and we send ACK.
             if (flag_bits[1] == "1" and flag_bits[2] == "1"):
@@ -249,8 +249,6 @@ class BTCPClientSocket(BTCPSocket):
         Again, you should feel free to deviate from how this usually works.
         """
 
-        added = 0
-
         DEF = super().build_segment_header(
                             self.sequence_number, self.ack_number,
                             syn_set=False, ack_set=False, fin_set=False,
@@ -324,7 +322,7 @@ class BTCPClientSocket(BTCPSocket):
         destructor itself. The easiest way of doing this is shown by the
         existing code:
             1. check whether the reference to the resource is not None.
-                2. if so, destroy the resource.
+            2. if so, destroy the resource.
             3. set the reference to None.
         """
         if self._lossy_layer is not None:
