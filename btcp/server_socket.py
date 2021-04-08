@@ -54,7 +54,7 @@ class BTCPServerSocket(BTCPSocket):
         self.ack_number = 0
 
         # Receive buffer
-        self.receive_buffer = queue.Queue()
+        self.receive_buffer = []
         
 
     ###########################################################################
@@ -117,7 +117,7 @@ class BTCPServerSocket(BTCPSocket):
                 self._lossy_layer.send_segment(FINACK)
 
             else:
-                self.receive_buffer.put(message[10:])
+                self.receive_buffer.append(message[10:10+data_length].decode('utf-8'))
 
         elif (self.state == BTCPStates.CLOSING):
             if (flag_bits[2] == "1"):
@@ -276,13 +276,12 @@ class BTCPServerSocket(BTCPSocket):
 
         Again, you should feel free to deviate from how this usually works.
         """
-        
-        while(self.receive_buffer.empty()):
+        while( len(self.receive_buffer) < 1 and self.state == BTCPStates.ESTABLISHED):
             continue
 
-        result = self.receive_buffer.queue.copy()
-        self.receive_buffer.queue.clear()
-        return result[0]
+        data = bytes(''.join(self.receive_buffer), 'utf-8')
+        self.receive_buffer = []
+        return data
 
     def close(self):
         """Cleans up any internal state by at least destroying the instance of

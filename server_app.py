@@ -40,8 +40,14 @@ def btcp_file_transfer_server():
 
     # Clean up any state
     s.accept()
+    while(True):
+        data = s.recv()
 
-    # output = s.recv()
+        print(len(data))
+        print()
+
+        if len(data) == 0:
+            break
 
     s.close()
 

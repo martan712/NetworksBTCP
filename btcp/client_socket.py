@@ -2,7 +2,7 @@ from btcp.btcp_socket import BTCPSocket, BTCPStates
 from btcp.lossy_layer import LossyLayer
 from btcp.constants import *
 
-import queue
+import os
 
 class BTCPClientSocket(BTCPSocket):
     """bTCP client socket
@@ -54,7 +54,7 @@ class BTCPClientSocket(BTCPSocket):
         self.acked_until = 0
 
         # Send buffer
-        self.send_buffer = queue.Queue()
+        self.send_buffer = []
 
 
     ###########################################################################
@@ -151,8 +151,8 @@ class BTCPClientSocket(BTCPSocket):
             self._lossy_layer.send_segment(FIN)
 
         elif (self.state == BTCPStates.ESTABLISHED):
-            segment = self.send_buffer.get()
-            self._lossy_layer.send_segment(segment)
+            for segment in self.send_buffer:
+                self._lossy_layer.send_segment(segment)
             
     ###########################################################################
     ### You're also building the socket API for the applications to use.    ###
@@ -249,22 +249,32 @@ class BTCPClientSocket(BTCPSocket):
         Again, you should feel free to deviate from how this usually works.
         """
 
-        DEF = super().build_segment_header(
-                            self.sequence_number, self.ack_number,
-                            syn_set=False, ack_set=False, fin_set=False,
-                            window=0x01, length=0, checksum=0)
+        while ( True ): #While there is more than 1008 bytes of data in file
+            if ( len(self.send_buffer) < 30 ):
+                #If que is not full, then fill que with messages read from data.
+                message = data.read(1008)
 
-        index = 0
+                print (len(message))
 
-        while index+1008 < len(data): 
-            segment = DEF + data[index:index+1008]
-            self.send_buffer.put(segment)
-            index = index + 1008
-        
-        segment = DEF + data[index:index+len(data)]
-        self.send_buffer.put(segment)
+                if len(message) == 0:
+                    break
 
-        return index+len(data)
+                header = super().build_segment_header(
+                        self.sequence_number, self.ack_number,
+                        syn_set=False, ack_set=False, fin_set=False,
+                        window=0x01, length=len(message), checksum=0)
+
+                self.sequence_number += len(message)
+
+                message = bytes(message, 'utf-8')
+                if( len(message) < 1008 ):
+                    message = message + b"0"*(1008-len(message) )
+
+                segment = header + message
+
+                self.send_buffer.append(segment)
+            
+                
 
     def shutdown(self):
         """Perform the bTCP three-way finish to shutdown the connection.
