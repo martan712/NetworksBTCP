@@ -117,6 +117,13 @@ class BTCPServerSocket(BTCPSocket):
                 self._lossy_layer.send_segment(FINACK)
 
             else:
+                #if(self.ack_number+1 == sequence_number):
+                self.ack_number += 1
+                ACK = super().build_segment_header(
+                            self.sequence_number, self.ack_number,
+                            syn_set=False, ack_set=True, fin_set=False,
+                            window=0x01, length=0, checksum=0)
+                self._lossy_layer.send_segment(ACK)
                 self.receive_buffer.append(message[10:10+data_length].decode('utf-8'))
 
         elif (self.state == BTCPStates.CLOSING):

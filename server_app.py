@@ -38,17 +38,19 @@ def btcp_file_transfer_server():
     # TODO Write your file transfer server code here using your
     # BTCPServerSocket's accept, and recv methods.
 
+
+    f = open("output.txt", mode='w')
     # Clean up any state
     s.accept()
     while(True):
         data = s.recv()
 
-        print(len(data))
-        print()
+        f.write(data.decode())
 
         if len(data) == 0:
             break
 
+    f.close()
     s.close()
 
 

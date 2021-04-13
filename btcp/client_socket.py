@@ -100,7 +100,8 @@ class BTCPClientSocket(BTCPSocket):
 
         elif (self.state == BTCPStates.ESTABLISHED):
             # Receive any message, and ack the appropriate message
-            True
+            if (flag_bits[1] == "1" and acknowledgement_number == self.sequence_number):
+                self.send_buffer.pop(0)
 
         elif (self.state == BTCPStates.FIN_SENT):
             # if message states that both FIN and ack, then we go to state BTCPStates.CLOSED and we send ACK.
@@ -153,6 +154,7 @@ class BTCPClientSocket(BTCPSocket):
         elif (self.state == BTCPStates.ESTABLISHED):
             for segment in self.send_buffer:
                 self._lossy_layer.send_segment(segment)
+                self.sequence_number += 1
             
     ###########################################################################
     ### You're also building the socket API for the applications to use.    ###
@@ -263,8 +265,6 @@ class BTCPClientSocket(BTCPSocket):
                         self.sequence_number, self.ack_number,
                         syn_set=False, ack_set=False, fin_set=False,
                         window=0x01, length=len(message), checksum=0)
-
-                self.sequence_number += len(message)
 
                 message = bytes(message, 'utf-8')
                 if( len(message) < 1008 ):
